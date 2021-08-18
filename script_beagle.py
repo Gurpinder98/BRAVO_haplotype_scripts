@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
 from collections import OrderedDict
 
 #TODO make a CLI
 GFF_FILE = "Brassica_napus.AST_PRJEB5043_v1.44.sorted.gff3"
-GENE_TO_LOOK = ['BnaC02g00490D'] #temporary arragement
+#GENE_TO_LOOK = ['BnaC02g00490D'] #temporary arragement
+GENE_TO_LOOK = ['BnaA02g00370D']
 VCF_FILE = 'test2.vcf'
 
 # create a structure {LKXXXX: {Gene1:(start,stop), Gene2:(start,strop)}, LKXXX:{{}}.. }
@@ -144,5 +146,71 @@ for super_locus in super_contigs.keys():
         
        
         
-#TODO clustering
+#TODO Distance Matrix
+
+samples = list(final_data[GENE_TO_LOOK[0]].keys())
+print("{} samples in samples list".format(len(samples)))
+Similarity_Matrix = np.zeros((len(samples), len(samples)))
+
+def distance_calculator(seqA_array, seqB_array):
+    """
+    Return distance between two loci based on two set of allele patterns
+
+    Parameters
+    ----------
+    seqA_array : List of two strings
+        eg. ['101001', '101101']
+    seqB_array : List of two strings
+        eg. ['101001', '101101']
+        
+
+    Returns
+    -------
+    float
+        distance between two samples, averaged. 
+        Scoring scheme: +1 if both allele patterns differ
+                        +0.5 if only one is different
+    """
+    try:
+        assert len(seqA_array[0]) == len(seqB_array[0])
+        assert len(seqA_array[1]) == len(seqB_array[1])
+    except:
+        AssertionError
+        print("Sequence length mismatch.")
+    pattern0 = zip(seqA_array[0], seqB_array[0])
+    difference0 = sum([1 for allele in pattern0 if allele[0] != allele[1]])
+    pattern1 = zip(seqA_array[1], seqB_array[1])
+    difference1 = sum([1 for allele in pattern1 if allele[0] != allele[1]])
+
+    return (difference0 + difference1)/2
+
+for vertical in range(Similarity_Matrix.shape[0]):
+    for horizontal in range(Similarity_Matrix.shape[1]):
+        Similarity_Matrix[vertical][horizontal] = distance_calculator(final_data[GENE_TO_LOOK[0]][samples[vertical]][1:],final_data[GENE_TO_LOOK[0]][samples[horizontal]][1:])
+
+# create a dendrogram
+from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.spatial.distance import squareform
+
+import matplotlib.pyplot as plt
+
+with open("sample_names.txt", "r") as in_f:
+    lines = in_f.readlines()
+
+sample_names_dict = {}
+for line in lines[1:]:
+    sample_names_dict[line.split("\t")[0]] = line.split("\t")[1]
+sample_line_names = [sample_names_dict[s] for s in samples]
+
+dists = squareform(Similarity_Matrix)
+linkage_matrix = linkage(dists, "single")
+plt.figure(figsize=(15,7))
+plt.box(False)
+dendrogram(linkage_matrix, labels=sample_line_names)
+plt.title(GENE_TO_LOOK[0])
+plt.savefig(GENE_TO_LOOK[0]+".pdf", dpi=300)
+
+
+
+
 #TODO final output
